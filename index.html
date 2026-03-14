@@ -1,0 +1,1572 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>Emission Knowledge Graph - 3D Curved Layers</title>
+
+<!-- 引入 Three.js 和 3d-force-graph -->
+<script src="https://unpkg.com/three@0.150.1/build/three.min.js"></script>
+<script src="https://unpkg.com/3d-force-graph@1.70.12/dist/3d-force-graph.min.js"></script>
+<script src="https://unpkg.com/three-spritetext"></script>
+
+<style>
+body { margin:0; overflow:hidden; font-family: 'Arial', sans-serif; }
+
+/* 🔐 密码锁屏层 */
+#loginOverlay {
+  position:fixed;
+  inset:0;
+  background:linear-gradient(135deg,#1e3c72,#2a5298);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:10000;
+}
+
+#loginBox {
+  background:white;
+  padding:30px 40px;
+  border-radius:12px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.3);
+  text-align:center;
+  width:320px;
+}
+
+#loginBox h2 { margin-top:0; color:#333; }
+#loginBox input {
+  width:100%;
+  padding:10px;
+  margin-top:12px;
+  font-size:16px;
+  border:1px solid #ddd;
+  border-radius:4px;
+  box-sizing:border-box;
+}
+#loginBox button {
+  width:100%;
+  padding:10px;
+  margin-top:12px;
+  font-size:16px;
+  cursor:pointer;
+  background:#4CAF50;
+  color:white;
+  border:none;
+  border-radius:4px;
+}
+#loginBox button:hover { background:#45a049; }
+#errorMsg {
+  color:red;
+  margin-top:10px;
+  display:none;
+}
+
+/* 控制面板 - 3D版本 */
+#controls {
+  position:absolute;
+  top:20px;
+  left:20px;
+  width:320px;
+  max-height:90vh;
+  overflow-y:auto;
+  background:rgba(255,255,255,0.95);
+  padding:16px;
+  border-radius:10px;
+  box-shadow:0 4px 20px rgba(0,0,0,0.2);
+  z-index:1000;
+  backdrop-filter:blur(5px);
+  border:1px solid #eee;
+  display:none;
+}
+
+#controls h3 {
+  margin:0 0 15px 0;
+  color:#333;
+  text-align:center;
+  border-bottom:2px solid #4CAF50;
+  padding-bottom:8px;
+}
+
+.filter-section {
+  margin-bottom:15px;
+  background:#f9f9f9;
+  border-radius:6px;
+  padding:10px;
+}
+
+.filter-section h4 {
+  margin:0 0 8px 0;
+  font-size:14px;
+  color:#555;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+
+/* 年份选择区域样式 */
+.year-header {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:8px;
+}
+
+.year-select-all {
+  display:flex;
+  align-items:center;
+  gap:5px;
+  font-size:12px;
+  cursor:pointer;
+  color:#4CAF50;
+}
+
+.year-select-all input[type="checkbox"] {
+  margin:0;
+  width:14px;
+  height:14px;
+  cursor:pointer;
+}
+
+.year-options {
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:8px;
+  max-height:120px;
+  overflow-y:auto;
+  padding:5px;
+  background:white;
+  border-radius:4px;
+  border:1px solid #ddd;
+}
+
+.year-option {
+  display:flex;
+  align-items:center;
+  gap:4px;
+  font-size:12px;
+  padding:4px 8px;
+  background:#f0f0f0;
+  border-radius:4px;
+  cursor:pointer;
+  transition:all 0.2s;
+}
+
+.year-option:hover {
+  background:#e0e0e0;
+}
+
+.year-option.selected {
+  background:#4CAF50;
+  color:white;
+}
+
+.year-option input[type="checkbox"] {
+  margin:0;
+  width:14px;
+  height:14px;
+  cursor:pointer;
+}
+
+/* 实体筛选器样式 */
+.entity-header {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  cursor:pointer;
+  padding:4px;
+  border-radius:4px;
+  background:#e8f5e9;
+  margin-bottom:8px;
+}
+
+.entity-header:hover {
+  background:#c8e6c9;
+}
+
+.entity-header input[type="checkbox"] {
+  margin:0;
+  width:16px;
+  height:16px;
+  cursor:pointer;
+}
+
+.entity-count {
+  font-size:11px;
+  color:#666;
+  background:#eee;
+  padding:2px 6px;
+  border-radius:10px;
+  margin-left:auto;
+}
+
+.entity-items {
+  max-height:200px;
+  overflow-y:auto;
+  border:1px solid #ddd;
+  border-radius:4px;
+  padding:5px;
+  background:white;
+}
+
+.entity-item {
+  display:flex;
+  align-items:center;
+  gap:6px;
+  padding:6px;
+  font-size:12px;
+  border-bottom:1px solid #f0f0f0;
+  cursor:pointer;
+  transition:background 0.2s;
+}
+
+.entity-item:hover {
+  background:#f5f5f5;
+}
+
+.entity-item.selected {
+  background:#e3f2fd;
+}
+
+.entity-item input[type="checkbox"] {
+  margin:0;
+  width:14px;
+  height:14px;
+  cursor:pointer;
+}
+
+.entity-item label {
+  cursor:pointer;
+  flex:1;
+  word-break:break-word;
+}
+
+.entity-select-all {
+  display:flex;
+  align-items:center;
+  gap:5px;
+  font-size:11px;
+  padding:5px 0;
+  color:#4CAF50;
+  cursor:pointer;
+  border-bottom:1px dashed #ddd;
+  margin-bottom:5px;
+}
+
+.entity-select-all input[type="checkbox"] {
+  margin:0;
+  width:14px;
+  height:14px;
+  cursor:pointer;
+}
+
+.button-group {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-top:15px;
+}
+
+.button-group button {
+  padding:10px;
+  border:none;
+  border-radius:5px;
+  cursor:pointer;
+  font-size:13px;
+  font-weight:bold;
+  transition:all 0.3s;
+}
+
+.button-group button:hover {
+  transform:translateY(-2px);
+  box-shadow:0 4px 10px rgba(0,0,0,0.15);
+}
+
+#searchBtn {
+  background:#4CAF50;
+  color:white;
+}
+
+#resetBtn {
+  background:#f44336;
+  color:white;
+}
+
+#centerBtn {
+  background:#2196F3;
+  color:white;
+}
+
+#loading {
+  position:absolute;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  color:white;
+  font-size:18px;
+  z-index:2000;
+  background:rgba(0,0,0,0.7);
+  padding:20px 40px;
+  border-radius:10px;
+  display:none;
+}
+
+/* 工具提示样式 */
+.graph-tooltip {
+  position: absolute;
+  background: rgba(0,0,0,0.95);
+  color: white;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  max-width: 400px;
+  max-height: 60vh;
+  overflow-y: auto;
+  pointer-events: none;
+  border-left: 4px solid #4CAF50;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  z-index: 10000;
+  line-height: 1.5;
+}
+
+.graph-tooltip strong {
+  color: #ffcc00;
+  font-size: 14px;
+}
+
+.graph-tooltip .tooltip-section {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #333;
+}
+
+.graph-tooltip .tooltip-title {
+  color: #99ccff;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.graph-tooltip .tooltip-content {
+  color: #ddd;
+  font-size: 12px;
+  word-break: break-word;
+}
+
+#nodeInfoPanel{
+  position:absolute;
+  right:0;
+  top:0;
+  width:420px;
+  height:100vh;
+  background:white;
+  border-left:1px solid #ddd;
+  padding:20px;
+  overflow-y:auto;
+  box-shadow:-5px 0 20px rgba(0,0,0,0.15);
+  display:none;
+  z-index:2000;
+}
+
+#nodeInfoPanel h2{
+  margin-top:0;
+  font-size:20px;
+}
+
+.paperItem{
+  padding:8px;
+  border-bottom:1px solid #eee;
+  font-size:13px;
+}
+
+.paperItem:hover{
+  background:#f5f5f5;
+}
+
+#yearDisplay{
+  position:absolute;
+  top:50px;
+  left:80%;
+  transform:translateX(-50%);
+  font-size:42px;
+  font-weight:bold;
+  color:rgba(0,0,0,0.25);
+  pointer-events:none;
+  user-select:none;
+  z-index:500;
+}
+
+</style>
+</head>
+<body>
+
+<!-- 🔐 登录层 -->
+<div id="loginOverlay">
+  <div id="loginBox">
+    <h2>🔒 Emission Inventory Knowledge Graph</h2>
+    <p>Please enter password to continue</p>
+    <input type="password" id="passwordInput" placeholder="Enter password" onkeypress="if(event.key==='Enter') checkPassword()"/>
+    <button onclick="checkPassword()">Unlock</button>
+    <div id="errorMsg">Incorrect password</div>
+  </div>
+</div>
+
+<!-- 加载提示 -->
+<div id="loading">Loading 3D Graph...</div>
+
+<!-- 控制面板 -->
+<div id="controls">
+  <h3>🔍 Emission Inventory Knowledge Graph</h3>
+  
+  <!-- 年份筛选 -->
+  <div class="filter-section">
+    <div class="year-header">
+      <h4 style="margin:0">📅 Year </h4>
+      <div class="year-select-all">
+        <input type="checkbox" id="selectAllYears" checked onchange="toggleAllYears()">
+        <label for="selectAllYears">Select All</label>
+      </div>
+    </div>
+    <div id="yearCount" class="entity-count" style="margin-bottom:8px; display:inline-block;">0 years</div>
+    <div id="yearOptions" class="year-options"></div>
+  </div>
+
+  <!-- 实体筛选器容器 -->
+  <div id="entityFilters"></div>
+
+  <div class="button-group">
+    <button id="searchBtn">🔍 Search</button>
+    <button id="resetBtn">🔄 Reset</button>
+    <button id="centerBtn">🎯 Center View</button>
+  </div>
+</div>
+
+<!-- 3D画布容器 -->
+<div id="graph-container"></div>
+
+<div id="nodeInfoPanel"></div>
+
+<div id="yearDisplay">All Years</div>
+
+<script>
+const PASSWORD = "EI-KG";
+let graph = null;
+let originalData = null;
+let tooltipDiv = null;
+
+// 实体类型层级和区域配置 - 曲线排布，高度变化
+const zoneConfig = {
+  // 上层曲线 - 8种类型的高度变化 - 整体抬高
+upperCurve: {
+  types: [
+    { 
+      name: "EmissionSource", 
+      zone: { 
+        x: [-1000, -700], 
+        z: [-200, 200],
+        y: [320, 360]  // 从 [220,260] 抬高到 [320,360]
+      },
+      description: "左端，最高"
+    },
+    { 
+      name: "Pollutant", 
+      zone: { 
+        x: [-700, -500], 
+        z: [-250, 250],
+        y: [300, 340]   // 从 [200,240] 抬高到 [300,340]
+      },
+      description: "左中，次高"
+    },
+    { 
+      name: "GreenhouseGas", 
+      zone: { 
+        x: [-500, -300], 
+        z: [-300, 300],
+        y: [280, 320]   // 从 [180,220] 抬高到 [280,320]
+      },
+      description: "中左，中等"
+    },
+    { 
+      name: "TransportProcess", 
+      zone: { 
+        x: [-300, -100], 
+        z: [-300, 300],
+        y: [260, 300]   // 从 [160,200] 抬高到 [260,300]
+      },
+      description: "中心，较低"
+    },
+    { 
+      name: "TransformationProcess", 
+      zone: { 
+        x: [-100, 100], 
+        z: [-300, 300],
+        y: [240, 280]   // 从 [140,180] 抬高到 [240,280]
+      },
+      description: "中心偏右，最低"
+    },
+    { 
+      name: "EnvironmentalMedium", 
+      zone: { 
+        x: [100, 300], 
+        z: [-300, 300],
+        y: [260, 300]   // 从 [160,200] 抬高到 [260,300]
+      },
+      description: "右中，较低"
+    },
+    { 
+      name: "Receptor", 
+      zone: { 
+        x: [300, 500], 
+        z: [-250, 250],
+        y: [280, 320]   // 从 [180,220] 抬高到 [280,320]
+      },
+      description: "右中，中等"
+    },
+    { 
+      name: "Impact", 
+      zone: { 
+        x: [500, 700], 
+        z: [-200, 200],
+        y: [300, 340]   // 从 [200,240] 抬高到 [300,340]
+      },
+      description: "右端，次高"
+    }
+  ]
+},
+
+// 中层 - 保持不变
+middleLayer: {
+  types: [
+    { 
+      name: "Regulation", 
+      zone: { 
+        x: [-600, -100], 
+        z: [-400, 400],
+        y: [-20, 20]    // 保持不变
+      },
+      description: "左区域" 
+    },
+    { 
+      name: "ControlTechnology", 
+      zone: { 
+        x: [100, 600], 
+        z: [-400, 400],
+        y: [-20, 20]    // 保持不变
+      },
+      description: "右区域" 
+    }
+  ]
+},
+
+// 下层 - 整体放低
+lowerLayer: {
+  types: [
+    { 
+      name: "EstimationMethod", 
+      zone: { 
+        x: [-300, 300], 
+        z: [-300, 300],
+        y: [-360, -320]  // 从 [-260,-220] 降低到 [-360,-320]
+      },
+      description: "中央区域" 
+    }
+  ]
+}
+};
+
+const colorMap = {
+  EmissionSource: "#e41a1c",
+  Pollutant: "#377eb8",
+  GreenhouseGas: "#4daf4a",
+  TransportProcess: "#984ea3",
+  TransformationProcess: "#ff7f00",
+  EnvironmentalMedium: "#a65628",
+  Receptor: "#f781bf",
+  Impact: "#999999",
+  Regulation: "#66c2a5",
+  ControlTechnology: "#fc8d62",
+  EstimationMethod: "#a6d854"
+};
+
+// 存储每个实体类型的可用节点（基于年份筛选）
+let availableNodesByType = {};
+
+// 存储当前选中的实体ID
+let selectedEntityIds = new Set();
+
+// 密码验证
+function checkPassword() {
+  const input = document.getElementById("passwordInput").value;
+  if (input === PASSWORD) {
+    document.getElementById("loginOverlay").style.display = "none";
+    document.getElementById("controls").style.display = "block";
+    document.getElementById("loading").style.display = "block";
+    loadGraph();
+  } else {
+    document.getElementById("errorMsg").style.display = "block";
+    setTimeout(() => {
+      document.getElementById("errorMsg").style.display = "none";
+    }, 2000);
+  }
+}
+
+function truncateText(text, maxLength) {
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength) + '...';
+}
+
+// 全选/取消全选年份
+function toggleAllYears() {
+  const selectAllCheckbox = document.getElementById('selectAllYears');
+  const yearCheckboxes = document.querySelectorAll('.year-option input[type="checkbox"]');
+  
+  yearCheckboxes.forEach(cb => {
+    cb.checked = selectAllCheckbox.checked;
+  });
+  
+  updateYearSelection();
+  updateAvailableNodesByYear();
+  selectedEntityIds.clear();
+  refreshEntityFilters();
+  updateYearDisplay();
+}
+
+// 更新年份选择状态
+function updateYearSelection() {
+  const yearCheckboxes = document.querySelectorAll('.year-option input[type="checkbox"]');
+  const selectAllCheckbox = document.getElementById('selectAllYears');
+  const yearOptions = document.querySelectorAll('.year-option');
+  
+  yearOptions.forEach((option, index) => {
+    if (yearCheckboxes[index].checked) {
+      option.classList.add('selected');
+    } else {
+      option.classList.remove('selected');
+    }
+  });
+  
+  const allChecked = Array.from(yearCheckboxes).every(cb => cb.checked);
+  const someChecked = Array.from(yearCheckboxes).some(cb => cb.checked);
+  
+  if (allChecked) {
+    selectAllCheckbox.checked = true;
+    selectAllCheckbox.indeterminate = false;
+  } else if (someChecked) {
+    selectAllCheckbox.indeterminate = true;
+  } else {
+    selectAllCheckbox.checked = false;
+    selectAllCheckbox.indeterminate = false;
+  }
+}
+
+// 获取选中的年份（去掉.0）
+function getSelectedYears() {
+  const yearCheckboxes = document.querySelectorAll('.year-option input[type="checkbox"]:checked');
+  const selectedYears = [];
+  
+  yearCheckboxes.forEach(cb => {
+    let year = cb.value;
+    if (year.includes('.0')) {
+      year = year.replace('.0', '');
+    }
+    selectedYears.push(year);
+  });
+  
+  return selectedYears;
+}
+
+// 根据选中年份更新可用节点
+function updateAvailableNodesByYear() {
+  const selectedYears = getSelectedYears();
+  
+  availableNodesByType = {};
+  
+  // 初始化所有类型
+  const allTypes = [
+    ...zoneConfig.upperCurve.types.map(t => t.name),
+    ...zoneConfig.middleLayer.types.map(t => t.name),
+    ...zoneConfig.lowerLayer.types.map(t => t.name)
+  ];
+  
+  allTypes.forEach(type => {
+    availableNodesByType[type] = [];
+  });
+  
+  originalData.nodes.forEach(node => {
+    if (selectedYears.length === 0 || 
+        (node.years && node.years.some(y => selectedYears.includes(String(y))))) {
+      if (availableNodesByType[node.type]) {
+        availableNodesByType[node.type].push(node);
+      }
+    }
+  });
+}
+
+// 根据选中的实体更新相关节点
+function updateRelatedNodes(selectedNodeId) {
+  if (!selectedNodeId) {
+    return availableNodesByType;
+  }
+  
+  const relatedNodeIds = new Set();
+  relatedNodeIds.add(selectedNodeId);
+  
+  originalData.links.forEach(link => {
+    const sourceId = getLinkSourceId(link);
+    const targetId = getLinkTargetId(link);
+    
+    if (sourceId === selectedNodeId) {
+      relatedNodeIds.add(targetId);
+    }
+    if (targetId === selectedNodeId) {
+      relatedNodeIds.add(sourceId);
+    }
+  });
+  
+  console.log('🔗 Related nodes found:', relatedNodeIds.size);
+  
+  const allTypes = [
+    ...zoneConfig.upperCurve.types.map(t => t.name),
+    ...zoneConfig.middleLayer.types.map(t => t.name),
+    ...zoneConfig.lowerLayer.types.map(t => t.name)
+  ];
+  
+  const newAvailableNodes = {};
+  allTypes.forEach(type => {
+    newAvailableNodes[type] = [];
+  });
+  
+  const selectedYears = getSelectedYears();
+  
+  relatedNodeIds.forEach(nodeId => {
+    const node = originalData.nodes.find(n => n.id === nodeId);
+    if (node) {
+      const yearMatch = selectedYears.length === 0 || 
+          (node.years && node.years.some(y => selectedYears.includes(String(y))));
+      
+      if (yearMatch && newAvailableNodes[node.type]) {
+        newAvailableNodes[node.type].push(node);
+      }
+    }
+  });
+  
+  return newAvailableNodes;
+}
+
+// 刷新实体筛选器
+function refreshEntityFilters() {
+  const container = document.getElementById('entityFilters');
+  container.innerHTML = '';
+  
+  let nodesToShow = availableNodesByType;
+  
+  const selectedIds = Array.from(selectedEntityIds);
+  if (selectedIds.length > 0) {
+    nodesToShow = updateRelatedNodes(selectedIds[0]);
+  }
+  
+  // 按曲线顺序显示
+  const orderedTypes = [
+    ...zoneConfig.upperCurve.types.map(t => t.name),
+    ...zoneConfig.middleLayer.types.map(t => t.name),
+    ...zoneConfig.lowerLayer.types.map(t => t.name)
+  ];
+  
+  orderedTypes.forEach(type => {
+    const nodesOfType = nodesToShow[type] || [];
+    if (nodesOfType.length === 0) return;
+    
+    const section = document.createElement('div');
+    section.className = 'filter-section';
+    section.id = `section-${type}`;
+    
+    const header = document.createElement('div');
+    header.className = 'entity-header';
+    
+    const typeCheckbox = document.createElement('input');
+    typeCheckbox.type = 'checkbox';
+    typeCheckbox.id = `enable_${type}`;
+    typeCheckbox.checked = true;
+    typeCheckbox.onchange = function() {
+      updateEntityItemsState(type, this.checked);
+    };
+    
+    const typeLabel = document.createElement('label');
+    typeLabel.htmlFor = `enable_${type}`;
+    typeLabel.innerHTML = `${type}`;
+    
+    const countSpan = document.createElement('span');
+    countSpan.className = 'entity-count';
+    countSpan.textContent = nodesOfType.length;
+    
+    header.appendChild(typeCheckbox);
+    header.appendChild(typeLabel);
+    header.appendChild(countSpan);
+    section.appendChild(header);
+    
+    const selectAllDiv = document.createElement('div');
+    selectAllDiv.className = 'entity-select-all';
+    
+    const selectAllCheckbox = document.createElement('input');
+    selectAllCheckbox.type = 'checkbox';
+    selectAllCheckbox.id = `selectAll_${type}`;
+    selectAllCheckbox.checked = true;
+    selectAllCheckbox.onchange = function() {
+      const itemCheckboxes = document.querySelectorAll(`.entity-item[data-type="${type}"] input[type="checkbox"]`);
+      itemCheckboxes.forEach(cb => {
+        cb.checked = selectAllCheckbox.checked;
+        if (cb.checked) {
+          selectedEntityIds.add(parseInt(cb.value));
+        } else {
+          selectedEntityIds.delete(parseInt(cb.value));
+        }
+      });
+      
+      if (selectedEntityIds.size > 0) {
+        refreshEntityFilters();
+      }
+    };
+    
+    const selectAllLabel = document.createElement('label');
+    selectAllLabel.htmlFor = `selectAll_${type}`;
+    selectAllLabel.textContent = 'Select All';
+    
+    selectAllDiv.appendChild(selectAllCheckbox);
+    selectAllDiv.appendChild(selectAllLabel);
+    section.appendChild(selectAllDiv);
+    
+    const itemsDiv = document.createElement('div');
+    itemsDiv.className = 'entity-items';
+    
+    nodesOfType.sort((a, b) => (a.name || a.label).localeCompare(b.name || b.label)).forEach(node => {
+      const itemDiv = document.createElement('div');
+      itemDiv.className = 'entity-item';
+      itemDiv.setAttribute('data-type', type);
+      itemDiv.setAttribute('data-node-id', node.id);
+      
+      const itemCheckbox = document.createElement('input');
+      itemCheckbox.type = 'checkbox';
+      itemCheckbox.id = `item_${node.id}`;
+      itemCheckbox.value = node.id;
+      itemCheckbox.checked = selectedEntityIds.has(node.id);
+      itemCheckbox.onchange = function(e) {
+        e.stopPropagation();
+        
+        if (this.checked) {
+          selectedEntityIds.add(node.id);
+        } else {
+          selectedEntityIds.delete(node.id);
+        }
+        
+        if (selectedEntityIds.size > 0) {
+          refreshEntityFilters();
+        } else {
+          refreshEntityFilters();
+        }
+        
+        updateSelectAllState(type);
+      };
+      
+      const itemLabel = document.createElement('label');
+      itemLabel.htmlFor = `item_${node.id}`;
+      itemLabel.textContent = node.name || node.label;
+      
+      itemDiv.appendChild(itemCheckbox);
+      itemDiv.appendChild(itemLabel);
+      
+      itemDiv.onclick = function(e) {
+        if (e.target !== itemCheckbox) {
+          itemCheckbox.checked = !itemCheckbox.checked;
+          itemCheckbox.onchange();
+        }
+      };
+      
+      itemsDiv.appendChild(itemDiv);
+    });
+    
+    section.appendChild(itemsDiv);
+    container.appendChild(section);
+  });
+}
+
+// 更新实体项的选择状态
+function updateEntityItemsState(type, checked) {
+  const itemCheckboxes = document.querySelectorAll(`.entity-item[data-type="${type}"] input[type="checkbox"]`);
+  itemCheckboxes.forEach(cb => {
+    cb.checked = checked;
+    if (checked) {
+      selectedEntityIds.add(parseInt(cb.value));
+    } else {
+      selectedEntityIds.delete(parseInt(cb.value));
+    }
+  });
+  
+  if (selectedEntityIds.size > 0) {
+    refreshEntityFilters();
+  }
+  
+  const selectAllCheckbox = document.getElementById(`selectAll_${type}`);
+  if (selectAllCheckbox) {
+    selectAllCheckbox.checked = checked;
+  }
+}
+
+// 更新全选状态
+function updateSelectAllState(type) {
+  const itemCheckboxes = document.querySelectorAll(`.entity-item[data-type="${type}"] input[type="checkbox"]`);
+  const selectAllCheckbox = document.getElementById(`selectAll_${type}`);
+  const typeCheckbox = document.getElementById(`enable_${type}`);
+  
+  if (itemCheckboxes.length === 0) return;
+  
+  const allChecked = Array.from(itemCheckboxes).every(cb => cb.checked);
+  const someChecked = Array.from(itemCheckboxes).some(cb => cb.checked);
+  
+  if (selectAllCheckbox) {
+    selectAllCheckbox.checked = allChecked;
+  }
+  
+  if (typeCheckbox) {
+    typeCheckbox.checked = someChecked;
+    typeCheckbox.indeterminate = someChecked && !allChecked;
+  }
+}
+
+// 获取所有选中的节点ID
+function getSelectedNodeIds() {
+  return selectedEntityIds;
+}
+
+// 加载数据
+async function loadGraph() {
+  try {
+    const response = await fetch('graph.json');
+    if (!response.ok) throw new Error('Failed to load graph.json');
+    
+    const data = await response.json();
+    originalData = data;
+    
+    console.log('✅ Graph loaded:', {
+      nodes: data.nodes.length,
+      links: data.links.length
+    });
+    
+    data.nodes.forEach(node => {
+      node.label = node.name || node.label;
+      node.val = 3 + Math.log((node.titles?.length || 1)+1)*2;
+      
+      if (node.years && Array.isArray(node.years)) {
+        node.years = node.years.map(y => {
+          let yearStr = String(y);
+          return yearStr.includes('.0') ? yearStr.replace('.0', '') : yearStr;
+        });
+      }
+    });
+    
+    data.nodes.forEach(node => {
+      node.color = colorMap[node.type] || '#888888';
+    });
+    
+    populateYearFilter(data);
+    updateAvailableNodesByYear();
+    refreshEntityFilters();
+    layoutNodes(data);
+    init3DGraph(data);
+    updateYearDisplay();
+    
+    document.getElementById('loading').style.display = 'none';
+  } catch (error) {
+    console.error('Error loading graph:', error);
+    document.getElementById('loading').innerHTML = 'Error loading graph. Please check console.';
+  }
+  
+
+}
+
+function updateYearDisplay(){
+
+  const years = getSelectedYears()
+    .map(y => parseInt(y))
+    .sort((a,b)=>a-b);
+
+  if(years.length === 0){
+    document.getElementById("yearDisplay").innerText = "";
+    return;
+  }
+
+  let ranges = [];
+  let start = years[0];
+  let prev = years[0];
+
+  for(let i=1;i<years.length;i++){
+
+    if(years[i] === prev + 1){
+      prev = years[i];
+    }else{
+
+      if(start === prev){
+        ranges.push(start);
+      }else{
+        ranges.push(`${start}-${prev}`);
+      }
+
+      start = years[i];
+      prev = years[i];
+    }
+
+  }
+
+  // 最后一段
+  if(start === prev){
+    ranges.push(start);
+  }else{
+    ranges.push(`${start}-${prev}`);
+  }
+
+  document.getElementById("yearDisplay").innerText = ranges.join(", ");
+
+}
+
+function layoutNodes(data){
+
+  // ===== 尺寸控制 =====
+  const innerRadius = 250;   // Impact 半径
+  const layerGap = 160;      // 每层间距
+
+  // ===== 内层 onion =====
+  const innerLayers = [
+    "Impact",
+    "Receptor",
+    "EnvironmentalMedium",
+    "TransformationProcess",
+    "TransportProcess"
+  ];
+
+  innerLayers.forEach((type, layerIndex)=>{
+
+    const nodes = data.nodes.filter(n => n.type === type);
+
+    const radius = innerRadius + layerIndex * layerGap;
+
+    nodes.forEach((node,i)=>{
+
+      const angle = nodes.length > 1
+        ? (i/(nodes.length-1))*Math.PI
+        : Math.PI/2;
+
+      node.fx = Math.cos(angle) * radius;
+      node.fy = Math.sin(angle) * radius;
+      node.fz = 0;
+
+    });
+
+  });
+
+
+  // ===== Pollutant 单独一层半圆 =====
+
+const pollutantNodes = data.nodes.filter(n => n.type === "Pollutant");
+
+const midRadius = innerRadius + innerLayers.length * layerGap;
+
+pollutantNodes.forEach((node,i)=>{
+
+  const angle = pollutantNodes.length > 1
+    ? (i/(pollutantNodes.length-1)) * Math.PI
+    : Math.PI/2;
+
+  node.fx = Math.cos(angle) * midRadius;
+  node.fy = Math.sin(angle) * midRadius;
+  node.fz = 0;
+
+});
+
+  
+
+  // ===== EmissionSource 超外层 =====
+
+  const emissionNodes = data.nodes.filter(n => n.type === "EmissionSource");
+
+  const outerRadius = midRadius + 650;  // EmissionSource 特别大
+
+  emissionNodes.forEach((node,i)=>{
+
+    const angle = emissionNodes.length>1
+      ? (i/(emissionNodes.length-1))*Math.PI
+      : Math.PI/2;
+
+    node.fx = Math.cos(angle) * outerRadius;
+    node.fy = Math.sin(angle) * outerRadius;
+    node.fz = 0;
+
+  });
+
+
+
+// ===== ControlTechnology = mirror of TransformationProcess =====
+
+const regulationNodes = data.nodes.filter(n => n.type === "ControlTechnology");
+
+const transportRadius = innerRadius + 4 * layerGap; // TransportProcess radius
+
+regulationNodes.forEach((node,i)=>{
+
+  const angle = regulationNodes.length > 1
+    ? (i/(regulationNodes.length-1))*Math.PI
+    : Math.PI/2;
+
+  node.fx = Math.cos(angle) * transportRadius;
+
+  // 向下镜像
+  node.fy = -Math.sin(angle) * transportRadius-300;
+
+  node.fz = 0;
+
+});
+
+
+
+
+// ===== Regulation = mirror of TransportProcess =====
+
+const controlNodes = data.nodes.filter(n => n.type === "Regulation");
+
+const transformationRadius = innerRadius + 3 * layerGap;
+
+controlNodes.forEach((node,i)=>{
+
+  const angle = controlNodes.length > 1
+    ? (i/(controlNodes.length-1))*Math.PI
+    : Math.PI/2;
+
+  node.fx = Math.cos(angle) * transformationRadius;
+
+  node.fy = -Math.sin(angle) * transformationRadius-300;
+
+  node.fz = 0;
+
+});
+
+// ===== EstimationMethod (mirror of EmissionSource) =====
+
+const estimationNodes = data.nodes.filter(n => n.type === "EstimationMethod");
+
+const estimationRadius = outerRadius;
+
+estimationNodes.forEach((node,i)=>{
+
+  const angle = estimationNodes.length > 1
+    ? (i/(estimationNodes.length-1))*Math.PI
+    : Math.PI/2;
+
+  node.fx = Math.cos(angle) * estimationRadius;
+
+  // 完全镜像 emission
+  node.fy = -Math.sin(angle) * estimationRadius-300;
+
+  node.fz = 0;
+
+});
+
+}
+
+// 初始化3D图 - 让悬停时的文字透明
+function init3DGraph(data) {
+  const container = document.getElementById('graph-container');
+  
+  graph = ForceGraph3D()(container)
+    .graphData(data)
+    .backgroundColor('#ffffff')
+    .nodeColor(node => colorMap[node.type] || '#888888')
+    .nodeRelSize(4)
+    .nodeResolution(20)
+    .nodeOpacity(0.9)
+    // 节点标签 - 黑色字体，一直显示
+    .nodeThreeObject(node => {
+
+  const group = new THREE.Group();
+
+  // 节点球体
+  const sphere = new THREE.Mesh(
+    new THREE.SphereGeometry(5),
+    new THREE.MeshLambertMaterial({
+      color: colorMap[node.type] || '#888888',
+      transparent: true,
+      opacity: 0.9
+    })
+  );
+
+  group.add(sphere);
+
+  // 节点名称
+  const label = new SpriteText(node.name || node.label);
+
+  label.color = colorMap[node.type] || "#888888"; // 和节点同色
+  label.textHeight = 8;
+  label.position.y = 12; // 在节点上方
+
+  group.add(label);
+
+  return group;
+
+})
+
+.nodeThreeObjectExtend(true)
+
+.nodeLabel(node => {
+
+  const name = node.name || node.label || "Unknown";
+  const type = node.type || "Unknown";
+
+  const years = node.years && node.years.length
+    ? node.years.join(", ")
+    : "N/A";
+
+  const paperCount = node.titles
+    ? node.titles.length
+    : 0;
+
+  return `
+    <div style="
+      background:rgba(0,0,0,0.95);
+      color:white;
+      padding:10px 12px;
+      border-radius:6px;
+      font-size:12px;
+      line-height:1.4;
+      max-width:260px;
+      border-left:4px solid ${colorMap[node.type] || '#888888'};
+      box-shadow:0 4px 12px rgba(0,0,0,0.4);
+    ">
+
+      <div style="
+        font-size:14px;
+        font-weight:bold;
+        color:${colorMap[node.type] || '#ffffff'};
+        margin-bottom:4px;
+      ">
+        ${name}
+      </div>
+
+      <div style="color:#aaa">Type: ${type}</div>
+
+      <div style="color:#aaa">
+        Years: ${years}
+      </div>
+
+      <div style="color:#ffcc00">
+        Papers: ${paperCount}
+      </div>
+
+    </div>
+  `;
+})
+
+
+    // 关系标签
+    .linkThreeObject(link => {
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      canvas.width = 256;
+      canvas.height = 64;
+      
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      
+      context.font = '28px Arial';
+      context.fillStyle = '#000000';
+      context.textAlign = 'center';
+      context.textBaseline = 'middle';
+      
+      const relation = link.relation || 'related';
+      context.fillText(relation, canvas.width / 2, canvas.height / 2);
+      
+      const texture = new THREE.CanvasTexture(canvas);
+      const material = new THREE.SpriteMaterial({ 
+        map: texture,
+        depthTest: false,
+        depthWrite: false,
+        transparent: true
+      });
+      const sprite = new THREE.Sprite(material);
+      
+      sprite.scale.set(60, 16, 1);
+      
+      return sprite;
+    })
+    .linkThreeObjectExtend(true)
+    .linkPositionUpdate((sprite, { start, end }) => {
+      const middlePos = {
+        x: start.x + (end.x - start.x) / 2,
+        y: start.y + (end.y - start.y) / 2,
+        z: start.z + (end.z - start.z) / 2
+      };
+      Object.assign(sprite.position, middlePos);
+      return sprite;
+    })
+    .linkColor(() => 'rgba(100,100,100,0.5)')
+    .linkWidth(1.5)
+    .linkDirectionalParticles(0)
+    
+    // 修改hover效果：让文字透明
+    .onNodeHover(node => {
+      if (node) {
+        // 悬停时，让所有节点的文字透明度降低，但不改变球体颜色
+        graph.graphData().nodes.forEach(n => {
+          if (n.__spriteMaterial) {
+            if (n.id === node.id) {
+              // 当前悬停的节点文字完全不透明
+              n.__spriteMaterial.opacity = 1;
+            } else {
+              // 其他节点文字完全透明
+              n.__spriteMaterial.opacity = 0;
+            }
+          }
+        });
+      } else {
+        // 离开悬停时，恢复所有节点文字完全不透明
+        graph.graphData().nodes.forEach(n => {
+          if (n.__spriteMaterial) {
+            n.__spriteMaterial.opacity = 1;
+          }
+        });
+      }
+    })
+    
+    .onNodeClick(node => {
+
+  const panel = document.getElementById("nodeInfoPanel");
+  panel.style.display = "block";
+
+  const name = node.name || node.label || "Unknown";
+  const type = node.type || "Unknown";
+
+  const years = node.years && node.years.length
+    ? node.years.join(", ")
+    : "N/A";
+
+  const paperCount = node.titles ? node.titles.length : 0;
+
+  let html = `
+  <h2 style="color:${colorMap[node.type]}">${name}</h2>
+
+  <div style="margin-bottom:10px">
+    <b>Type:</b> ${type}<br>
+    <b>Years:</b> ${years}<br>
+    <b>Papers:</b> ${paperCount}
+  </div>
+
+  <hr>
+
+  <h3>Related Papers</h3>
+  `;
+
+  if(node.titles && node.titles.length){
+
+    node.titles.forEach((title,i)=>{
+
+      html += `
+      <div class="paperItem">
+        ${i+1}. ${title}
+      </div>
+      `;
+
+    });
+
+  } else {
+
+    html += `<div>No paper titles available</div>`;
+
+  }
+
+  panel.innerHTML = html;
+
+  // 相机移动保持原功能
+  const distance = 200;
+  graph.cameraPosition(
+    { x: node.x * 1.5, y: node.y * 1.5, z: node.z * 1.5 + distance },
+    { x: node.x, y: node.y, z: node.z },
+    1000
+  );
+
+})
+
+
+    .onNodeRightClick(node => {
+      if (node.fx) {
+        node.fx = undefined;
+        node.fy = undefined;
+        node.fz = undefined;
+      } else {
+        node.fx = node.x;
+        node.fy = node.y;
+        node.fz = node.z;
+      }
+    });
+  
+  graph.d3Force('charge').strength(-100);
+  graph.d3Force('link').distance(200).strength(0.05);
+
+  graph.onBackgroundClick(() => {
+  document.getElementById("nodeInfoPanel").style.display = "none";
+});
+
+}
+
+// 填充年份筛选器
+function populateYearFilter(data) {
+  const years = new Set();
+  data.nodes.forEach(node => {
+    if (node.years && Array.isArray(node.years)) {
+      node.years.forEach(y => {
+        let yearStr = String(y);
+        if (yearStr.includes('.0')) {
+          yearStr = yearStr.replace('.0', '');
+        }
+        years.add(yearStr);
+      });
+    }
+  });
+  
+  const yearOptionsDiv = document.getElementById('yearOptions');
+  yearOptionsDiv.innerHTML = '';
+  
+  Array.from(years).sort().forEach(year => {
+    const optionDiv = document.createElement('div');
+    optionDiv.className = 'year-option';
+    
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.value = year;
+    checkbox.checked = true;
+    checkbox.onchange = function() {
+      updateYearSelection();
+      updateAvailableNodesByYear();
+      selectedEntityIds.clear();
+      refreshEntityFilters();
+      updateYearDisplay();
+    };
+    
+    const label = document.createElement('span');
+    label.textContent = year;
+    
+    optionDiv.appendChild(checkbox);
+    optionDiv.appendChild(label);
+    optionDiv.onclick = function(e) {
+      if (e.target !== checkbox) {
+        checkbox.checked = !checkbox.checked;
+        checkbox.onchange();
+      }
+    };
+    
+    yearOptionsDiv.appendChild(optionDiv);
+  });
+  
+  document.getElementById('yearCount').textContent = years.size + ' years';
+}
+
+// 辅助函数：安全地获取链接的源和目标ID
+function getLinkSourceId(link) {
+  return link.source && link.source.id !== undefined ? link.source.id : link.source;
+}
+
+function getLinkTargetId(link) {
+  return link.target && link.target.id !== undefined ? link.target.id : link.target;
+}
+
+// 应用筛选器 - 按曲线布局
+function applyFilters() {
+  if (!originalData || !graph) return;
+  
+  if (selectedEntityIds.size === 0) {
+    graph.graphData(originalData);
+    centerView();
+    return;
+  }
+  
+  const connectedLinks = originalData.links.filter(link => {
+    const sourceId = getLinkSourceId(link);
+    const targetId = getLinkTargetId(link);
+    return selectedEntityIds.has(sourceId) || selectedEntityIds.has(targetId);
+  });
+  
+  console.log('🔗 Connected links found:', connectedLinks.length);
+  
+  const allConnectedNodeIds = new Set(selectedEntityIds);
+  
+  connectedLinks.forEach(link => {
+    allConnectedNodeIds.add(getLinkSourceId(link));
+    allConnectedNodeIds.add(getLinkTargetId(link));
+  });
+  
+  console.log('📊 Total nodes to display:', allConnectedNodeIds.size);
+  
+  let nodesToShow = originalData.nodes.filter(node => 
+    allConnectedNodeIds.has(node.id)
+  );
+  
+  // 按曲线布局节点 - 高度沿着X轴变化
+  layoutNodes({
+  nodes: nodesToShow
+});
+
+  // 更新图数据
+  graph.graphData({
+    nodes: nodesToShow,
+    links: connectedLinks
+  });
+  
+  // 调整相机视角
+  setTimeout(() => {
+    graph.cameraPosition(
+      { x: 0, y: 200, z: 1500 },
+      { x: 0, y: 0, z: 0 },
+      1000
+    );
+  }, 100);
+}
+
+// 重置所有筛选
+function resetFilters() {
+
+  document.querySelectorAll('.year-option input[type="checkbox"]').forEach(cb => {
+    cb.checked = true;
+  });
+
+  document.getElementById('selectAllYears').checked = true;
+  document.getElementById('selectAllYears').indeterminate = false;
+
+  updateYearSelection();
+
+  selectedEntityIds.clear();
+
+  updateAvailableNodesByYear();
+  refreshEntityFilters();
+
+  if (originalData && graph) {
+
+    // ⭐ 重新应用布局
+    layoutNodes(originalData);
+
+    graph.graphData(originalData);
+
+    centerView();
+
+  }
+
+}
+
+// 居中视图
+function centerView() {
+  if (graph) {
+    graph.cameraPosition({ x: 0, y: 200, z: 1200 });
+  }
+}
+
+// 事件监听
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('searchBtn').addEventListener('click', applyFilters);
+  document.getElementById('resetBtn').addEventListener('click', resetFilters);
+  document.getElementById('centerBtn').addEventListener('click', centerView);
+});
+</script>
+
+</body>
+</html>
