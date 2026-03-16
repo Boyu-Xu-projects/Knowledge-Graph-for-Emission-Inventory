@@ -951,7 +951,9 @@ async function loadGraph() {
     
     data.nodes.forEach(node => {
       node.label = node.name || node.label;
-      node.val = 3 + Math.log((node.titles?.length || 1)+1)*2;
+      
+      // 使用 paper_count 而不是 titles.length
+      node.val = 3 + Math.log((node.paper_count || 1)) * 2;
       
       if (node.years && Array.isArray(node.years)) {
         node.years = node.years.map(y => {
@@ -959,6 +961,13 @@ async function loadGraph() {
           return yearStr.includes('.0') ? yearStr.replace('.0', '') : yearStr;
         });
       }
+      
+      // 重要：不要创建 titles 和 dois 数组，直接使用 papers
+      // 这行代码被注释掉了，避免覆盖正确的数据
+      // if (node.papers && !node.titles) {
+      //   node.titles = node.papers.map(p => p.title);
+      //   node.dois = node.papers.map(p => p.doi);
+      // }
     });
     
     data.nodes.forEach(node => {
@@ -978,7 +987,9 @@ async function loadGraph() {
     document.getElementById('loading').innerHTML = 'Error loading graph. Please check console.';
   }
   
-
+  // 调试信息
+  console.log('📊 Sample node structure:', data.nodes[0]);
+  console.log('📊 Sample node papers:', data.nodes[0].papers);
 }
 
 function updateYearDisplay(){
@@ -1179,14 +1190,32 @@ function init3DGraph(data) {
     .nodeRelSize(4)
     .nodeResolution(20)
     .nodeOpacity(0.9)
+    // 节点大小根据论文数量动态调整 - 让最大节点更大
+    .nodeVal(node => {
+      // 基础大小是4，根据论文数量增加
+      const baseSize = 4;
+      const paperCount = node.paper_count || (node.papers ? node.papers.length : 1);
+      
+      // 使用对数缩放，让大小差异更明显
+      // 公式: 4 + log2(paperCount) * 3
+      // 如果paperCount=1: 4 + 0 = 4
+      // 如果paperCount=4: 4 + 2*3 = 10
+      // 如果paperCount=16: 4 + 4*3 = 16
+      // 如果paperCount=64: 4 + 6*3 = 22
+      let size = baseSize + Math.log2(paperCount) * 3;
+      
+      // 限制范围在4-22之间，让最大节点更大
+      return Math.min(Math.max(size, 4), 22);
+    })
     // 节点标签 - 黑色字体，一直显示
     .nodeThreeObject(node => {
 
   const group = new THREE.Group();
 
-  // 节点球体
+  // 节点球体 - 根据论文数量调整大小
+  const nodeSize = graph.nodeVal()(node); // 获取计算后的大小
   const sphere = new THREE.Mesh(
-    new THREE.SphereGeometry(5),
+    new THREE.SphereGeometry(nodeSize),
     new THREE.MeshLambertMaterial({
       color: colorMap[node.type] || '#888888',
       transparent: true,
@@ -1196,12 +1225,11 @@ function init3DGraph(data) {
 
   group.add(sphere);
 
-  // 节点名称
+  // 节点名称 - 标签大小也相应调整
   const label = new SpriteText(node.name || node.label);
-
-  label.color = colorMap[node.type] || "#888888"; // 和节点同色
-  label.textHeight = 8;
-  label.position.y = 12; // 在节点上方
+  label.color = colorMap[node.type] || "#888888";
+  label.textHeight = nodeSize * 1.5; // 标签大小与节点大小相关
+  label.position.y = nodeSize + 6; // 标签位置随节点大小调整
 
   group.add(label);
 
@@ -1220,9 +1248,7 @@ function init3DGraph(data) {
     ? node.years.join(", ")
     : "N/A";
 
-  const paperCount = node.titles
-    ? node.titles.length
-    : 0;
+  const paperCount = node.paper_count || (node.papers ? node.papers.length : 0);
 
   return `
     <div style="
@@ -1287,7 +1313,8 @@ function init3DGraph(data) {
       });
       const sprite = new THREE.Sprite(material);
       
-      sprite.scale.set(60, 16, 1);
+      // 调小关系标签的尺寸
+      sprite.scale.set(40, 12, 1); // 从 60,16 减小到 40,12
       
       return sprite;
     })
@@ -1301,8 +1328,8 @@ function init3DGraph(data) {
       Object.assign(sprite.position, middlePos);
       return sprite;
     })
-    .linkColor(() => 'rgba(100,100,100,0.5)')
-    .linkWidth(1.5)
+    .linkColor(() => 'rgba(100,100,100,0.4)') // 稍微调淡一点
+    .linkWidth(0.8) // 从 1.5 减小到 0.8，让连接线更细
     .linkDirectionalParticles(0)
     
     // 修改hover效果：让文字透明
@@ -1331,7 +1358,6 @@ function init3DGraph(data) {
     })
     
     .onNodeClick(node => {
-
   const panel = document.getElementById("nodeInfoPanel");
   panel.style.display = "block";
 
@@ -1342,7 +1368,26 @@ function init3DGraph(data) {
     ? node.years.join(", ")
     : "N/A";
 
-  const paperCount = node.titles ? node.titles.length : 0;
+  const paperCount = node.paper_count || (node.papers ? node.papers.length : (node.titles ? node.titles.length : 0));
+
+  // 调试信息：打印节点数据结构
+  console.log('📊 Clicked node:', {
+    id: node.id,
+    name: name,
+    type: type,
+    has_papers: !!node.papers,
+    papers_length: node.papers?.length,
+    has_titles: !!node.titles,
+    titles_length: node.titles?.length,
+    has_dois: !!node.dois,
+    dois_length: node.dois?.length,
+    paper_count: node.paper_count
+  });
+
+  // 如果存在papers，打印第一篇论文的详细信息
+  if (node.papers && node.papers.length > 0) {
+    console.log('📄 First paper example:', node.papers[0]);
+  }
 
   let html = `
   <h2 style="color:${colorMap[node.type]}">${name}</h2>
@@ -1358,22 +1403,83 @@ function init3DGraph(data) {
   <h3>Related Papers</h3>
   `;
 
-  if(node.titles && node.titles.length){
-
-    node.titles.forEach((title,i)=>{
-
+  if (node.papers && node.papers.length > 0) {
+    // 新数据结构 - 直接使用papers数组
+    node.papers.forEach((paper, i) => {
+      const title = paper.title || "Unknown Title";
+      const doi = paper.doi || "";
+      
+      let doiLink = "";
+      if (doi) {
+        if (doi.startsWith("http")) {
+          doiLink = `<a href="${doi}" target="_blank">${doi}</a>`;
+        } else {
+          const cleanDoi = doi.replace(/^doi:/i, '').trim();
+          if (cleanDoi) {
+            doiLink = `<a href="https://doi.org/${cleanDoi}" target="_blank">${cleanDoi}</a>`;
+          }
+        }
+      }
+      
+      const yearInfo = paper.year ? ` (${paper.year})` : "";
+      const fileInfo = paper.file ? ` - ${paper.file}` : "";
+      
       html += `
       <div class="paperItem">
-        ${i+1}. ${title}
+        <div><b>${i+1}. ${title}${yearInfo}</b></div>
+        ${doi ? `<div style="font-size:12px;color:#555;margin-top:4px;">DOI: ${doiLink}</div>` : ""}
+        ${paper.file ? `<div style="font-size:11px;color:#777;margin-top:2px;">File: ${paper.file}</div>` : ""}
       </div>
       `;
-
     });
-
+  } else if (node.paper_items && node.paper_items.length > 0) {
+    // 如果数据结构是 paper_items
+    node.paper_items.forEach((item, i) => {
+      const title = item.title || "Unknown Title";
+      const doi = item.doi || "";
+      
+      let doiLink = "";
+      if (doi) {
+        if (doi.startsWith("http")) {
+          doiLink = `<a href="${doi}" target="_blank">${doi}</a>`;
+        } else {
+          doiLink = `<a href="https://doi.org/${doi}" target="_blank">${doi}</a>`;
+        }
+      }
+      
+      html += `
+      <div class="paperItem">
+        <div><b>${i+1}. ${title}</b></div>
+        ${doi ? `<div style="font-size:12px;color:#555;margin-top:4px;">DOI: ${doiLink}</div>` : ""}
+      </div>
+      `;
+    });
+  } else if (node.titles && node.titles.length > 0) {
+    // 兼容旧数据结构 - 使用 titles 和 dois
+    // 但确保 dois 存在且长度匹配
+    const dois = node.dois || [];
+    
+    node.titles.forEach((title, i) => {
+      const doi = i < dois.length ? dois[i] : "";
+      
+      let doiLink = "";
+      if (doi) {
+        if (doi.startsWith("http")) {
+          doiLink = `<a href="${doi}" target="_blank">${doi}</a>`;
+        } else {
+          doiLink = `<a href="https://doi.org/${doi}" target="_blank">${doi}</a>`;
+        }
+      }
+      
+      html += `
+      <div class="paperItem">
+        <div><b>${i+1}. ${title}</b></div>
+        ${doi ? `<div style="font-size:12px;color:#555;margin-top:4px;">DOI: ${doiLink}</div>` : ""}
+      </div>
+      `;
+    });
   } else {
-
     html += `<div>No paper titles available</div>`;
-
   }
 
   panel.innerHTML = html;
@@ -1385,7 +1491,6 @@ function init3DGraph(data) {
     { x: node.x, y: node.y, z: node.z },
     1000
   );
-
 })
 
 
@@ -1409,6 +1514,7 @@ function init3DGraph(data) {
 });
 
 }
+
 
 // 填充年份筛选器
 function populateYearFilter(data) {
