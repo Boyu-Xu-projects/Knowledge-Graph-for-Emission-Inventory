@@ -1074,7 +1074,7 @@ function layoutNodes(data){
 
   // ===== Pollutant 单独一层半圆 =====
 
-const pollutantNodes = data.nodes.filter(n => n.type === "Pollutant");
+const pollutantNodes = data.nodes.filter(n => n.type === "GreenhouseGas");
 
 const midRadius = innerRadius + innerLayers.length * layerGap;
 
@@ -1090,7 +1090,24 @@ pollutantNodes.forEach((node,i)=>{
 
 });
 
-  
+  // ===== GreenhouseGas 内层半圆（比 Pollutant 更小） =====
+
+const ghgNodes = data.nodes.filter(n => n.type === "Pollutant");
+
+// 比 Pollutant 再往里收一点
+const ghgRadius = midRadius + 350;  // ← 控制大小（可以调：80 / 150）
+
+ghgNodes.forEach((node,i)=>{
+
+  const angle = ghgNodes.length > 1
+    ? (i/(ghgNodes.length-1)) * Math.PI
+    : Math.PI/2;
+
+  node.fx = Math.cos(angle) * ghgRadius;
+  node.fy = Math.sin(angle) * ghgRadius;
+  node.fz = 0;
+
+});
 
   // ===== EmissionSource 超外层 =====
 
