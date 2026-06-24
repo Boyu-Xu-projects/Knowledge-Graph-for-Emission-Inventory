@@ -3,7 +3,7 @@ import json
 import os
 
 # ========= 配置 =========
-INPUT_FILE = r"C:\Users\xuboy\saf_llm_ner_project\FCC-organise-entities\03-14-FCC-data.xlsx"
+INPUT_FILE = r"C:\Users\xuboy\saf_llm_ner_project\FCC-organise-entities\06-24-FCC-data.xlsx"
 OUTPUT_JSON = r"C:\Users\xuboy\saf_llm_ner_project\FCC-KG\graph.json"
 # ======================
 

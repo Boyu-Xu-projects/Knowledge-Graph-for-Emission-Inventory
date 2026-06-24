@@ -357,6 +357,7 @@ body { margin:0; overflow:hidden; font-family: 'Arial', sans-serif; }
   top:0;
   width:420px;
   height:100vh;
+  box-sizing:border-box;
   background:white;
   border-left:1px solid #ddd;
   padding:20px;
@@ -1262,7 +1263,10 @@ function init3DGraph(data) {
   const type = node.type || "Unknown";
 
   const years = node.years && node.years.length
-    ? node.years.join(", ")
+    ? [...node.years]
+        .map(y => parseInt(y))
+        .sort((a,b)=>b-a)
+        .join(", ")
     : "N/A";
 
   const paperCount = node.paper_count || (node.papers ? node.papers.length : 0);
@@ -1382,8 +1386,11 @@ function init3DGraph(data) {
   const type = node.type || "Unknown";
 
   const years = node.years && node.years.length
-    ? node.years.join(", ")
-    : "N/A";
+  ? [...node.years]
+      .map(y => parseInt(y))
+      .sort((a,b)=>b-a)
+      .join(", ")
+  : "N/A";
 
   const paperCount = node.paper_count || (node.papers ? node.papers.length : (node.titles ? node.titles.length : 0));
 
@@ -1421,8 +1428,17 @@ function init3DGraph(data) {
   `;
 
   if (node.papers && node.papers.length > 0) {
-    // 新数据结构 - 直接使用papers数组
-    node.papers.forEach((paper, i) => {
+
+    const sortedPapers = [...node.papers].sort((a,b)=>{
+
+        const yearA = parseInt(a.year || 0);
+        const yearB = parseInt(b.year || 0);
+
+        return yearB - yearA;
+
+    });
+
+    sortedPapers.forEach((paper, i) => {
       const title = paper.title || "Unknown Title";
       const doi = paper.doi || "";
       
@@ -1443,7 +1459,7 @@ function init3DGraph(data) {
       
       html += `
       <div class="paperItem">
-        <div><b>${i+1}. ${title}${yearInfo}</b></div>
+        <div><b>[${paper.year || "N/A"}]</b>${title}</div>
         ${doi ? `<div style="font-size:12px;color:#555;margin-top:4px;">DOI: ${doiLink}</div>` : ""}
         ${paper.file ? `<div style="font-size:11px;color:#777;margin-top:2px;">File: ${paper.file}</div>` : ""}
       </div>
@@ -1551,7 +1567,9 @@ function populateYearFilter(data) {
   const yearOptionsDiv = document.getElementById('yearOptions');
   yearOptionsDiv.innerHTML = '';
   
-  Array.from(years).sort().forEach(year => {
+  Array.from(years)
+  .sort((a,b)=>parseInt(b)-parseInt(a))
+  .forEach(year => {
     const optionDiv = document.createElement('div');
     optionDiv.className = 'year-option';
     
